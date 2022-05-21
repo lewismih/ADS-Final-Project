@@ -1,1 +1,1 @@
-web: gunicorn covid_app:server
+web: sh setup.sh && streamlit run covid_app.py
