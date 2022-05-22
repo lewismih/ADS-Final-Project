@@ -5,15 +5,21 @@ This data is then broken down into meaningful chunks which the reader can easily
 
 The goal is to get you Covid Data in as much real-time as possible with a slight delay of 24hours for collection and analysis of data (with the exception of weekends). This means, that updates are available  for up to one day (24hrs) before the Present Day.
 
+
+
+###
 ## Please Note: 
 THAT WE NEITHER REPRESENT NOR ACT ON BEHALF OF MOH-Kenya. AND AS A RESULT ENCOURAGE USERS TO FOLLOW ALL PRESCRIBED GUIDELINES AND PROCEDURES AS ADVICED BY THE MINISTRY OF HEALTH OF KENYA.
 
 
+
+###
 ## Application Access
 Visual Dashboard (desktop): https://kenya-covid19-feed-tracker.herokuapp.com/
 
 
 
+###
 ## The Enabling Technologies
 This Application has been built using:
   - Python
@@ -24,7 +30,7 @@ This Application has been built using:
   - Seaborn
 
 
-
+###
 ## Terms of use
 This data repository is copyright 2022 Lewis M.K. , all rights reserved, is provided to the public strictly for educational and academic research purposes.
 This data cannot be reproduced without the express consent/authorization of the owner (Lewis M.K.) in written form.
