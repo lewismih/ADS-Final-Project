@@ -3,7 +3,7 @@ This application has been created with aim of providing a comprehensive Feed for
 The Covid-19 Feed & Tracker Kenya Project collects information from various sources including: WHO, JHU CSSE, CDC, ECDC, NHC of the PRC, DXY, QQ, and various international media, in order to provide the most comprehensive testing data collectible for the novel coronavirus, SARS-CoV-2.
 This data is then broken down into meaningful chunks which the reader can easily understand and comprehend.
 
-The goal is to get you Covid Data in as much real-time as possible with a slight delay of 24-48hours for collection and analysis of data. This means, that updates are available  for up to one day (24hrs) before the Present Day.
+The goal is to get you Covid Data in as much real-time as possible with a slight delay of 24-48hours for collection and analysis of data. This means, that updates for the previous day are rolled out daily at Mid-Day (12 noon) EAT Local Time.
 
 
 
