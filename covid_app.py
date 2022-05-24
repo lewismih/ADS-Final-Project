@@ -14,7 +14,43 @@ from streamlit_option_menu import option_menu
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title='Latest Covid News Kenya', page_icon='📢', layout='wide')
-# @st.cache(suppress_st_warning=True, persist=True, allow_output_mutation=True)
+
+
+# -- DATA COLLECTION SECTION USING JSON from 2 independent Sources
+response = requests.get(
+    "https://webhooks.mongodb-stitch.com/api/client/v2.0/app/covid-19-qppza/service/REST-API/incoming_webhook/global?country=Kenya&hide_fields=_id, country, country_code, country_iso2, country_iso3, loc, state, uid'").text
+response_info = json.loads(response)
+
+response1 = requests.get("https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2020-01-22&endDate=2023-05-21").text
+response_info_1 = json.loads(response1)
+
+# ------------- List creation
+covid_cases = []
+for country_info in response_info:
+    covid_cases.append(
+        [country_info["confirmed"], country_info["deaths"], country_info["recovered"],
+         country_info["confirmed_daily"],
+         country_info["deaths_daily"], country_info["recovered_daily"], country_info["date"]])
+
+covid_df = pd.DataFrame(data=covid_cases,
+                        columns=["confirmed", "deaths", "recovered", "confirmed_daily", "deaths_daily",
+                                 "recovered_daily", "date"])
+# --
+covid_cases_1 = []
+for country_info in response_info_1:
+    covid_cases_1.append(
+        [country_info["new_recovered"], country_info["last_updated"]])
+
+covid_df_1 = pd.DataFrame(data=covid_cases_1, columns=["new_recovered", "date"])
+
+# ------------- Data Merging from the 2 sources
+
+covid_df_merged = pd.merge(covid_df, covid_df_1, how='inner', on='date')
+
+# ------------- Date Conversion
+covid_df_merged["Report_Date"] = pd.to_datetime(pd.to_datetime(covid_df_merged["date"]).dt.date).dt.normalize()
+
+
 
 # Hide Hamburger Menu
 hide_menu_style = """
@@ -26,44 +62,7 @@ st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # =============================================
 
-
 def show_home_page():
-    # -- DATA COLLECTION SECTION USING JSON from 2 independent Sources
-    response = requests.get(
-        "https://webhooks.mongodb-stitch.com/api/client/v2.0/app/covid-19-qppza/service/REST-API/incoming_webhook/global"
-        "?country=Kenya&hide_fields=_id, country, country_code, country_iso2, country_iso3, loc, state, uid'").text
-    response_info = json.loads(response)
-
-    response1 = requests.get("https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2020"
-                             "-01-22&endDate=2022-05-21").text
-    response_info_1 = json.loads(response1)
-
-    # ------------- List creation
-    covid_cases = []
-    for country_info in response_info:
-        covid_cases.append(
-            [country_info["confirmed"], country_info["deaths"], country_info["recovered"],
-             country_info["confirmed_daily"],
-             country_info["deaths_daily"], country_info["recovered_daily"], country_info["date"]])
-
-    covid_df = pd.DataFrame(data=covid_cases,
-                            columns=["confirmed", "deaths", "recovered", "confirmed_daily", "deaths_daily",
-                                     "recovered_daily", "date"])
-    # --
-    covid_cases_1 = []
-    for country_info in response_info_1:
-        covid_cases_1.append(
-            [country_info["new_recovered"], country_info["last_updated"]])
-
-    covid_df_1 = pd.DataFrame(data=covid_cases_1, columns=["new_recovered", "date"])
-
-    # ------------- Data Merging from the 2 sources
-
-    covid_df_merged = pd.merge(covid_df, covid_df_1, how='inner', on='date')
-
-    # ------------- Date Conversion
-    covid_df_merged["Report_Date"] = pd.to_datetime(pd.to_datetime(covid_df_merged["date"]).dt.date).dt.normalize()
-
     # -- HEADER SECTION
     tit1, tit2, tit3 = st.columns(3)
     with tit2:
