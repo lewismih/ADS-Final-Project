@@ -32,5 +32,5 @@ This Application has been built using:
 
 ###
 ## Terms of use
-This data repository is copyright 2022 Lewis M.K. , all rights reserved, is provided to the public strictly for educational and academic research purposes.
+This data repository is copyright 2022 Lewis M.K. , all rights reserved, and is provided to the public strictly for educational & academic research purposes.
 This data cannot be reproduced without the express consent/authorization of the owner (Lewis M.K.) in written form.
