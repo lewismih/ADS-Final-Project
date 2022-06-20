@@ -90,7 +90,10 @@ def show_home_page():
             'confirmed_daily'].mean().unstack(level=0)
 
     # -- SECTION 1
-    st.info(f"Kenya's Covid-19 Report: {df_covid_date}")
+    # st.info(f"Kenya's Covid-19 Report: {df_covid_date}")
+    col_t1, col_t2 = st.columns(2)
+    col_t1.metric("Kenya's Covid-19 Report Dated:", f"{df_covid_date}", "Updates are done Daily at Noon [+GMT3]")
+    col_t2.metric("", "", "")
 
     reg1, reg2, reg3 = st.columns(3)
     with reg1:
