@@ -7,6 +7,9 @@ import numpy as np
 from st_card_component_2 import card_component
 from PIL import Image
 import matplotlib.pyplot as plt
+from bokeh.plotting import figure
+from bokeh.models.formatters import DatetimeTickFormatter
+from bokeh.models import ColumnDataSource
 import calendar
 import seaborn as sns
 from streamlit_lottie import st_lottie
@@ -15,14 +18,20 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title='Latest Covid News Kenya', page_icon='📢', layout='wide')
 
-
 # -- DATA COLLECTION SECTION USING JSON from 2 independent Sources
 response = requests.get(
     "https://webhooks.mongodb-stitch.com/api/client/v2.0/app/covid-19-qppza/service/REST-API/incoming_webhook/global?country=Kenya&hide_fields=_id, country, country_code, country_iso2, country_iso3, loc, state, uid'").text
 response_info = json.loads(response)
 
-response1 = requests.get("https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2020-01-22&endDate=2023-05-21").text
+response1 = requests.get(
+    "https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2022-01-01&endDate=2023-07-21").text
 response_info_1 = json.loads(response1)
+
+response2 = requests.get(
+    "https://api.coronatracker.com/v5/analytics/trend/country?countryCode=KE&startDate=2022-07-07&endDate=2023-07-21").text
+response_info_2 = json.loads(response2)
+
+
 
 # ------------- List creation
 covid_cases = []
@@ -35,6 +44,7 @@ for country_info in response_info:
 covid_df = pd.DataFrame(data=covid_cases,
                         columns=["confirmed", "deaths", "recovered", "confirmed_daily", "deaths_daily",
                                  "recovered_daily", "date"])
+
 # --
 covid_cases_1 = []
 for country_info in response_info_1:
@@ -43,14 +53,25 @@ for country_info in response_info_1:
 
 covid_df_1 = pd.DataFrame(data=covid_cases_1, columns=["new_recovered", "date"])
 
+
+# --
+covid_cases_2 = []
+for country_info in response_info_2:
+    covid_cases_2.append(
+        [country_info["total_recovered"], country_info["last_updated"]])
+
+covid_df_2 = pd.DataFrame(data=covid_cases_2, columns=["total_recovered", "date"])
+
+
 # ------------- Data Merging from the 2 sources
 
 covid_df_merged = pd.merge(covid_df, covid_df_1, how='inner', on='date')
 
+# covid_df_merged = pd.merge(covid_df_merged, covid_df_2, how='inner', on='date')
+
+
 # ------------- Date Conversion
-covid_df_merged["Report_Date"] = pd.to_datetime(pd.to_datetime(covid_df_merged["date"]).dt.date).dt.normalize()
-
-
+covid_df["Report_Date"] = pd.to_datetime(pd.to_datetime(covid_df["date"]).dt.date).dt.normalize()
 
 # Hide Hamburger Menu
 hide_menu_style = """
@@ -59,6 +80,7 @@ hide_menu_style = """
         </style>
         """
 st.markdown(hide_menu_style, unsafe_allow_html=True)
+
 
 # =============================================
 
@@ -72,9 +94,9 @@ def show_home_page():
     # ------------- Components Section 1
     df_covid_confirmed = covid_df_merged["confirmed"][covid_df_merged.index[-1]]
     df_covid_deaths = covid_df_merged["deaths"][covid_df_merged.index[-1]]
-    df_covid_recovered = covid_df_merged["new_recovered"].sum()
+    df_covid_recovered = covid_df_2["total_recovered"][covid_df_2.index[-1]]
 
-    df_covid_date = covid_df_merged["Report_Date"].dt.strftime('%d-%m-%Y')[covid_df_merged.index[-1]]
+    df_covid_date = covid_df["Report_Date"].dt.strftime('%d-%m-%Y')[covid_df.index[-1]]
 
     df_covid_new_confirmed = (covid_df_merged["confirmed_daily"][covid_df_merged.index[-1]])
     df_covid_new_deaths = (covid_df_merged["deaths_daily"][covid_df_merged.index[-1]])
@@ -85,9 +107,13 @@ def show_home_page():
     df_covid_fatality_rate = np.round(((df_covid_deaths / df_covid_confirmed) * 100), decimals=2)
 
     # ------------- Components Section 3
-    df_covid_monthly = \
-        covid_df_merged.groupby([covid_df_merged.Report_Date.dt.year, covid_df_merged.Report_Date.dt.month])[
-            'confirmed_daily'].mean().unstack(level=0)
+    df_covid_monthly = covid_df.groupby([covid_df.Report_Date.dt.year, covid_df.Report_Date.dt.month])['confirmed_daily'].mean().unstack(level=0)
+
+    # ------------- Components Section 4
+    covid_df_merged_last_2weeks = covid_df_merged[-14:]
+    covid_df_bokeh_data_last_2weeks = covid_df_merged_last_2weeks.drop(['confirmed', 'deaths', 'recovered', 'recovered_daily', 'date'], axis=1)
+    bi_weekly_dict = covid_df_bokeh_data_last_2weeks.to_dict('list')
+
 
     # -- SECTION 1
     # st.info(f"Kenya's Covid-19 Report: {df_covid_date}")
@@ -181,18 +207,50 @@ def show_home_page():
 
     with st.container():
         ix = list(range(0, len(df_covid_monthly.columns), 10))
-        with sns.axes_style("darkgrid"):
-            for i in ix:
-                plt.figure(figsize=(12, 4))
-                data = df_covid_monthly.iloc[:, i:i + 10]
-                sns.lineplot(data=data, markers=True, dashes=False)
+        with plt.ion():
+            with sns.axes_style("darkgrid"):
+                for i in ix:
+                    plt.figure(figsize=(12, 4))
+                    data = df_covid_monthly.iloc[:, i:i + 10]
+                    sns.lineplot(data=data, markers=True, dashes=False)
 
-                plt.xticks(np.arange(1, 13), calendar.month_name[1:13], rotation=30)
-                plt.ylim(0, 1500)
-                plt.xlabel('Month')
-                plt.ylabel('Confirmed Covid Cases Monthly')
-                plt.title(f"Monthly Covid Cases Comparison\n in Kenya since 2020")
-                st.pyplot(plt.gcf())
+                    plt.xticks(np.arange(1, 13), calendar.month_name[1:13], rotation=30)
+                    plt.ylim(0, 1500)
+                    plt.xlabel('Month')
+                    plt.ylabel('Confirmed Covid Cases Monthly')
+                    plt.title(f"Monthly Covid Cases Comparison\n in Kenya since 2020")
+                    st.pyplot(plt.gcf())
+
+
+    # # -- Section 4
+    # with st.container():
+    #     df_daily_covid_cases = ["confirmed_daily", "new_recovered", "deaths_daily"]
+    #     lables = ["Confirmed daily", "New recovered", "Deaths daily"]
+    #     colors = ["blue", "green", "red"]
+    #
+    #     source = ColumnDataSource(data=bi_weekly_dict)
+    #
+    #     p = figure(x_axis_type='datetime', height=450, title="Daily Covid Cases",
+    #                toolbar_location=None, tools="hover", tooltips="$name @df_last_2weeks_date: @$name")
+    #     p.vbar_stack(df_daily_covid_cases, x="Report_Date", source=source, width=86400, alpha=0.7, color=colors,
+    #                  legend_label=lables)
+    #
+    #     p.width = 1000
+    #     p.y_range.start = 0
+    #     p.x_range.range_padding = 0.1
+    #     p.xaxis.major_label_orientation = 3.142 / 4
+    #     p.xaxis.axis_label = "Date"
+    #     p.xgrid.grid_line_color = None
+    #     p.axis.minor_tick_line_color = None
+    #     p.outline_line_color = None
+    #     p.legend.location = "top_left"
+    #     p.legend.orientation = "horizontal"
+    #     p.xaxis.formatter = DatetimeTickFormatter(months="%d/%m", days="%d/%m")
+    #     p.legend.click_policy = "mute"
+    #
+    #     st.bokeh_chart(p, use_container_width=True)
+
+
 
     # ---- ACKNOWLEDGEMENTS ----
     with st.container():
@@ -203,7 +261,6 @@ def show_home_page():
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
 def show_about_page():
-
     # -- Lottie Animation
     def load_lottieurl(url):
         r = requests.get(url)
@@ -272,7 +329,6 @@ def show_about_page():
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
 
 def show_news_page():
-
     # Lottie Animation
     def load_lottieurl(url):
         r = requests.get(url)
@@ -316,9 +372,9 @@ def show_news_page():
 # =================
 
 selected_menu = option_menu(None,
-                        ["Home", "News", "About"],
-                        icons=['house', 'cloud-upload', "list-task"],
-                        menu_icon="cast", default_index=0, orientation="horizontal")
+                            ["Home", "News", "About"],
+                            icons=['house', 'cloud-upload', "list-task"],
+                            menu_icon="cast", default_index=0, orientation="horizontal")
 
 if selected_menu == 'Home':
     show_home_page()
@@ -328,5 +384,3 @@ if selected_menu == 'About':
     show_about_page()
 
 # ==================================
-
-
