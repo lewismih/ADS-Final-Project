@@ -7,9 +7,8 @@ import numpy as np
 from st_card_component_2 import card_component
 from PIL import Image
 import matplotlib.pyplot as plt
-from bokeh.plotting import figure
-from bokeh.models.formatters import DatetimeTickFormatter
-from bokeh.models import ColumnDataSource
+import pygal
+from st_aggrid import AgGrid, GridOptionsBuilder
 import calendar
 import seaborn as sns
 from streamlit_lottie import st_lottie
@@ -24,16 +23,14 @@ response = requests.get(
 response_info = json.loads(response)
 
 response1 = requests.get(
-    "https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2022-01-01&endDate=2023-07-21").text
+    "https://api.coronatracker.com/v5/analytics/newcases/country?countryCode=KE&startDate=2022-02-01&endDate=2023-07-21").text
 response_info_1 = json.loads(response1)
 
 response2 = requests.get(
     "https://api.coronatracker.com/v5/analytics/trend/country?countryCode=KE&startDate=2022-07-07&endDate=2023-07-21").text
 response_info_2 = json.loads(response2)
 
-
-
-# ------------- List creation
+# ------------- List creation from external Json Links
 covid_cases = []
 for country_info in response_info:
     covid_cases.append(
@@ -53,7 +50,6 @@ for country_info in response_info_1:
 
 covid_df_1 = pd.DataFrame(data=covid_cases_1, columns=["new_recovered", "date"])
 
-
 # --
 covid_cases_2 = []
 for country_info in response_info_2:
@@ -62,13 +58,9 @@ for country_info in response_info_2:
 
 covid_df_2 = pd.DataFrame(data=covid_cases_2, columns=["total_recovered", "date"])
 
-
-# ------------- Data Merging from the 2 sources
+# ------------- Data Merging from first 2 sources
 
 covid_df_merged = pd.merge(covid_df, covid_df_1, how='inner', on='date')
-
-# covid_df_merged = pd.merge(covid_df_merged, covid_df_2, how='inner', on='date')
-
 
 # ------------- Date Conversion
 covid_df["Report_Date"] = pd.to_datetime(pd.to_datetime(covid_df["date"]).dt.date).dt.normalize()
@@ -82,6 +74,8 @@ hide_menu_style = """
 st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 
+# =============================================
+# HOME
 # =============================================
 
 def show_home_page():
@@ -107,16 +101,18 @@ def show_home_page():
     df_covid_fatality_rate = np.round(((df_covid_deaths / df_covid_confirmed) * 100), decimals=2)
 
     # ------------- Components Section 3
-    df_covid_monthly = covid_df.groupby([covid_df.Report_Date.dt.year, covid_df.Report_Date.dt.month])['confirmed_daily'].mean().unstack(level=0)
+    df_covid_monthly = covid_df.groupby([covid_df.Report_Date.dt.year, covid_df.Report_Date.dt.month])[
+        'confirmed_daily'].mean().unstack(level=0)
 
     # ------------- Components Section 4
+    covid_df_merged["Report_Date"] = (pd.to_datetime(pd.to_datetime(covid_df_merged["date"]).dt.date).dt.normalize()).dt.strftime('%d-%m-%Y')
     covid_df_merged_last_2weeks = covid_df_merged[-14:]
-    covid_df_bokeh_data_last_2weeks = covid_df_merged_last_2weeks.drop(['confirmed', 'deaths', 'recovered', 'recovered_daily', 'date'], axis=1)
-    bi_weekly_dict = covid_df_bokeh_data_last_2weeks.to_dict('list')
+    covid_df_pygal_data_last_14_days = covid_df_merged_last_2weeks.drop(['confirmed', 'deaths', 'recovered', 'recovered_daily', 'date'], axis=1)
+    bi_weekly_dict = covid_df_pygal_data_last_14_days.to_dict('list')
 
 
+    # -------------------------------------------------
     # -- SECTION 1
-    # st.info(f"Kenya's Covid-19 Report: {df_covid_date}")
     col_t1, col_t2 = st.columns(2)
     col_t1.metric("Kenya's Covid-19 Report Dated:", f"{df_covid_date}", "Updates are done Daily at Noon [+GMT3]")
     col_t2.metric("", "", "")
@@ -221,45 +217,55 @@ def show_home_page():
                     plt.title(f"Monthly Covid Cases Comparison\n in Kenya since 2020")
                     st.pyplot(plt.gcf())
 
+    st.write("---")
+    st.markdown("## Covid Data Breakdown")
 
-    # # -- Section 4
-    # with st.container():
-    #     df_daily_covid_cases = ["confirmed_daily", "new_recovered", "deaths_daily"]
-    #     lables = ["Confirmed daily", "New recovered", "Deaths daily"]
-    #     colors = ["blue", "green", "red"]
-    #
-    #     source = ColumnDataSource(data=bi_weekly_dict)
-    #
-    #     p = figure(x_axis_type='datetime', height=450, title="Daily Covid Cases",
-    #                toolbar_location=None, tools="hover", tooltips="$name @df_last_2weeks_date: @$name")
-    #     p.vbar_stack(df_daily_covid_cases, x="Report_Date", source=source, width=86400, alpha=0.7, color=colors,
-    #                  legend_label=lables)
-    #
-    #     p.width = 1000
-    #     p.y_range.start = 0
-    #     p.x_range.range_padding = 0.1
-    #     p.xaxis.major_label_orientation = 3.142 / 4
-    #     p.xaxis.axis_label = "Date"
-    #     p.xgrid.grid_line_color = None
-    #     p.axis.minor_tick_line_color = None
-    #     p.outline_line_color = None
-    #     p.legend.location = "top_left"
-    #     p.legend.orientation = "horizontal"
-    #     p.xaxis.formatter = DatetimeTickFormatter(months="%d/%m", days="%d/%m")
-    #     p.legend.click_policy = "mute"
-    #
-    #     st.bokeh_chart(p, use_container_width=True)
+    # -- Section 4
+    with st.container():
+        tab1, tab2 = st.tabs(["📈 Chart", "🗃 Data"])
+
+        # ------ Draw Stacked Bar for the last 2 weeks ------
+        with tab1:
+            st.subheader("Covid Cases the 2 Weeks")
+            bar_chart = pygal.StackedBar()
+            bar_chart.title = 'Daily Covid Cases'
+            bar_chart.x_labels = covid_df_pygal_data_last_14_days["Report_Date"]
+            bar_chart.add('Confirmed Daily', bi_weekly_dict["confirmed_daily"])
+            bar_chart.add('Recovered Daily', bi_weekly_dict["new_recovered"])
+            bar_chart.add('Deaths Daily', bi_weekly_dict["deaths_daily"])
+            bar_chart.height = 350
+            bar_chart.x_label_rotation = 320
+            chart = bar_chart.render()
+            st.markdown(f'{chart}', unsafe_allow_html=True)
 
 
+            # ------ Chart Data for the last 2 weeks ------
+        with tab2:
+            st.subheader("Raw-Covid Data for last 30 Days") # TAB title
+            data_table = covid_df_merged.drop(['confirmed', 'deaths', 'recovered', 'recovered_daily', 'date'], axis=1)
+            data_table = data_table[["Report_Date", "confirmed_daily", "new_recovered", "deaths_daily"]][-30:]
+            data_table = data_table.sort_index(ascending=False, axis=0)
 
-    # ---- ACKNOWLEDGEMENTS ----
+            gb = GridOptionsBuilder.from_dataframe(data_table, max_column_width=30)
+            gb.configure_column("Report_Date", header_name='Report Date')
+            gb.configure_column("confirmed_daily", header_name='Confirmed Daily')
+            gb.configure_column("new_recovered", header_name='New Recovered')
+            gb.configure_column("deaths_daily", header_name='Deaths Daily')
+
+            AgGrid(data_table, gridOptions=gb.build(), width='100%')
+            # AgGrid(data_table)
+
+        # ---- ACKNOWLEDGEMENTS ----
     with st.container():
         st.write("---")
         st.write(
-            "COVID Data Sources: WHO, JHU CSSE, CDC, ECDC, NHC of the PRC, DXY, QQ, and various international media")
+            "COVID Data Sources: WHO, JHU CSSE, CDC, ECDC, NHC of the PRC, DXY, QQ, CORONATRACKER.com and various international media")
+        st.write("v.2.1")
 
 
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ABOUT PAGE
+# =============================================
 def show_about_page():
     # -- Lottie Animation
     def load_lottieurl(url):
@@ -326,7 +332,9 @@ def show_about_page():
             st.markdown(contact_form, unsafe_allow_html=True)
 
 
-# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ #
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# NEWS PAGE
+# =============================================
 
 def show_news_page():
     # Lottie Animation
